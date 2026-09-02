@@ -27,6 +27,16 @@ public class ApiExceptionHandler {
         return response(HttpStatus.BAD_REQUEST, message);
     }
 
+    @ExceptionHandler(InvalidEventTransitionException.class)
+    ResponseEntity<Map<String, Object>> invalidTransition(InvalidEventTransitionException ex) {
+        return response(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<Map<String, Object>> badRequest(IllegalArgumentException ex) {
+        return response(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<Map<String, Object>> conflict(DataIntegrityViolationException ex) {
         return response(HttpStatus.CONFLICT, "The record conflicts with an existing record or is still referenced");

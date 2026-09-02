@@ -297,6 +297,82 @@ Base path: `/api/profile-types`
 
 Required: `code`, `name`, `active`.
 
+## Phase 1 location and language masters
+
+Run these PostgreSQL scripts in order (both are safe to rerun):
+
+1. `src/main/resources/db/phase1-master-schema.sql`
+2. `src/main/resources/db/phase1-master-seed.sql`
+
+The seed contains all Indian states/union territories and scheduled languages,
+plus representative districts and cities for initial testing. A complete,
+production-approved locality dataset can be loaded later using the same natural
+keys. Parent records cannot be deleted while child records refer to them.
+
+All five controllers support the common CRUD operations documented above.
+
+| Master | Base path | Optional list filter |
+|---|---|---|
+| Country | `/api/countries` | — |
+| State | `/api/states` | `?country_id={id}` |
+| District | `/api/districts` | `?state_id={id}` |
+| City | `/api/cities` | `?district_id={id}` |
+| Language | `/api/languages` | — |
+
+Example editable request bodies (shown as JSON with labels for brevity):
+
+```jsonc
+// Country
+{"code":"IND","name":"India","phone_code":"+91","display_order":1,"active":true}
+
+// State
+{"country_id":1,"code":"KL","name":"Kerala","display_order":1,"active":true}
+
+// District
+{"state_id":1,"code":"EKM","name":"Ernakulam","display_order":1,"active":true}
+
+// City
+{"district_id":1,"code":"KOC","name":"Kochi","postal_code":"682001","display_order":1,"active":true}
+
+// Language
+{"code":"ml","name":"Malayalam","native_name":"മലയാളം","display_order":1,"active":true}
+```
+
+For dependent frontend controls, load countries first, then call the filtered
+state, district, and city endpoints as each parent selection changes.
+
+## Phase 2 maintenance masters
+
+Run these PostgreSQL scripts in order. Both are safe to rerun:
+
+1. `src/main/resources/db/phase2-master-schema.sql`
+2. `src/main/resources/db/phase2-master-seed.sql`
+
+| Master | Base path |
+|---|---|
+| Event Delivery Mode | `/api/event-delivery-modes` |
+| Training Delivery Mode | `/api/training-delivery-modes` |
+| Event Type | `/api/event-types` |
+| Training Type | `/api/training-types` |
+| Opportunity Type | `/api/opportunity-types` |
+| Organization Type | `/api/organization-types` |
+
+Every Phase 2 master supports the common list, get, create, update, and delete
+operations documented at the start of this guide. All use the same editable body:
+
+```json
+{
+  "code": "ONLINE",
+  "name": "Online",
+  "description": "Delivered online",
+  "display_order": 1,
+  "active": true
+}
+```
+
+Required fields are `code`, `name`, and `active`. The `description` field is
+optional. The server manages `id`, `created_at`, and `updated_at`.
+
 ### DashboardController
 
 The dashboard is read-only:
@@ -356,6 +432,50 @@ const { data: updated } = await api.put(`/profile-types/${created.id}`, {
 await api.delete(`/profile-types/${created.id}`);
 ```
 
+## Topic images
+
+Create the topic first, then upload or replace its image using the same endpoint:
+
+```http
+POST /api/technologies/{id}/image
+POST /api/medical-subjects/{id}/image
+Content-Type: multipart/form-data
+```
+
+The multipart field name is `file`. JPEG, PNG, and WebP files up to 2 MB are
+accepted. `PUT` is also supported for compatibility with older Admin App code.
+The backend validates the decoded dimensions, generates WebP variants, uploads
+them to Azure, and generates the blob keys. The frontend must not send or
+construct a blob key or use Azure credentials.
+
+```text
+master/topics/{topicType}/{topicId}/{version}/thumb.webp
+master/topics/{topicType}/{topicId}/{version}/small.webp
+master/topics/{topicType}/{topicId}/{version}/medium.webp
+```
+
+`topicType` is `technology` or `medical-subject`. PostgreSQL stores only the
+preferred `small.webp` key in `image_key`; `image_url` is transient API output
+derived from `MEDIA_PUBLIC_BASE_URL`. Replacing or deleting a topic removes its
+old Azure variants only after the database transaction commits.
+
+Set all of these before starting the application:
+
+```text
+AZURE_STORAGE_CONNECTION_STRING=<secret connection string>
+AZURE_STORAGE_CONTAINER=public-media
+MEDIA_PUBLIC_BASE_URL=https://<account>.blob.core.windows.net/public-media
+```
+
+The container must already exist and allow public read access, or the public
+base URL must be a CDN endpoint. Upload and delete access belongs only to the
+backend connection string. Rotate any Azure storage key that was previously
+committed to configuration.
+
+Legacy local keys (`master/topics/{fieldId}/...`) are not uploaded automatically.
+Re-upload those images through the topic image endpoints (or migrate and verify
+them separately) before removing the local media backup.
+
 ## Dates
 
 Send timestamps without a timezone in ISO local-date-time format:
@@ -407,3 +527,29 @@ APP_CORS_ALLOWED_ORIGINS=https://admin.example.com
 
 The value must be an origin only: scheme, host, and optional port. Do not add
 `/api` or a trailing path.
+
+## Phase 2 maintenance masters
+
+Run these idempotent PostgreSQL scripts in order:
+
+1. `src/main/resources/db/phase2-master-schema.sql`
+2. `src/main/resources/db/phase2-master-seed.sql`
+
+| Master | Base path |
+|---|---|
+| Event Delivery Mode | `/api/event-delivery-modes` |
+| Training Delivery Mode | `/api/training-delivery-modes` |
+| Event Type | `/api/event-types` |
+| Training Type | `/api/training-types` |
+| Opportunity Type | `/api/opportunity-types` |
+| Organization Type | `/api/organization-types` |
+
+Every endpoint supports `GET /`, `GET /{id}`, `POST /`, `PUT /{id}`, and
+`DELETE /{id}`. Create and update requests use this shape:
+
+```json
+{"code":"ONLINE","name":"Online","description":"Delivered online","display_order":1,"active":true}
+```
+
+Required fields are `code`, `name`, and `active`. IDs and timestamps are
+server-managed. Codes are unique within each master.

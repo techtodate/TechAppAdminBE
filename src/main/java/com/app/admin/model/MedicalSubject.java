@@ -48,6 +48,14 @@ public class MedicalSubject {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "image_key", length = 500)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String imageKey;
+
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String imageUrl;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)

@@ -50,4 +50,12 @@ public class Technology {
 
     @Column(name = "field_id", nullable = true)
     private Long fieldId;
+
+    @Column(name = "image_key", length = 500)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String imageKey;
+
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String imageUrl;
 }

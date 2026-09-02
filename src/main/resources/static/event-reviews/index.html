@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event reviews</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Platform administration</p>
+      <h1>Event reviews</h1>
+    </div>
+    <button id="resetButton" class="button button-secondary" type="button">Reset demo data</button>
+  </header>
+
+  <main>
+    <section class="summary" aria-label="Review summary">
+      <div><strong id="pendingCount">0</strong><span>Awaiting review</span></div>
+      <div><strong id="approvedCount">0</strong><span>Approved</span></div>
+      <div><strong id="rejectedCount">0</strong><span>Rejected</span></div>
+    </section>
+
+    <div class="layout">
+      <section class="queue" aria-labelledby="queueTitle">
+        <div class="section-heading">
+          <div><p class="eyebrow">Queue</p><h2 id="queueTitle">Under review</h2></div>
+          <label class="search"><span class="sr-only">Search events</span><input id="searchInput" type="search" placeholder="Search events"></label>
+        </div>
+        <div id="eventList" class="event-list"></div>
+        <div id="emptyState" class="empty" hidden>No under-review events match your search.</div>
+      </section>
+
+      <aside id="detailsPanel" class="details" aria-live="polite">
+        <div class="empty details-empty">Select an event to inspect all submitted details.</div>
+      </aside>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
