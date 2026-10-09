@@ -1,0 +1,7 @@
+import {useQuery} from '@tanstack/react-query'
+import {institutionAdminService as api} from '../../../services/institutionAdminService'
+import type {Institution} from '../../../types/institution'
+import {Details, Dialog, Notice, QueryState} from './Shared'
+import {date} from './formatting'
+export function SourceRecords({institution}: {institution: Institution}) { return <section><h3>Source Records</h3>{institution.sourceRecords ? institution.sourceRecords.length ? institution.sourceRecords.map(record => <article className="im-section panel" key={record.id}><Details values={{Source: record.source?.sourceName, Identifier: record.sourceIdentifier, 'Last Seen': date(record.lastSeenAt)}}/>{record.rawData && <details><summary>Source Data</summary><pre>{JSON.stringify(record.rawData, null, 2)}</pre></details>}</article>) : <p>No source records.</p> : <><Details values={{Source: institution.source?.sourceName, Identifier: institution.sourceIdentifier}}/><Notice>Full source records and last-seen dates are not available in the current response.</Notice></>}</section> }
+export default function InstitutionSourceRecordModal({id, close}: {id: number; close: () => void}) { const query = useQuery({queryKey: ['institution', id], queryFn: () => api.institution(id)}); return <Dialog title="Source Records" close={close}><QueryState pending={query.isPending} error={query.error} retry={query.refetch}/>{query.data && <SourceRecords institution={query.data}/>}</Dialog> }

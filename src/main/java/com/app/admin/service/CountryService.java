@@ -17,9 +17,9 @@ public class CountryService {
     @Transactional public Country create(Country value) { value.setId(null); value.setCreatedAt(null); value.setUpdatedAt(null); return repository.saveAndFlush(value); }
     @Transactional public Country update(Long id, Country value) {
         Country current = findById(id); current.setCode(value.getCode()); current.setName(value.getName());
-        current.setPhoneCode(value.getPhoneCode()); current.setDisplayOrder(value.getDisplayOrder()); current.setActive(value.getActive());
+        current.setPhoneCode(value.getPhoneCode()); current.setActive(value.getActive());
         return repository.saveAndFlush(current);
     }
     @Transactional public void delete(Long id) { repository.delete(findById(id)); repository.flush(); }
-    private Sort masterSort() { return Sort.by(Sort.Order.asc("displayOrder"), Sort.Order.asc("name")); }
+    private Sort masterSort() { return Sort.by(Sort.Order.asc("name"), Sort.Order.asc("id")); }
 }

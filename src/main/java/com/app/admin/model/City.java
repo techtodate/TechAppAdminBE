@@ -1,5 +1,6 @@
 package com.app.admin.model;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -13,37 +14,79 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "city", schema = "public", uniqueConstraints =
-        @UniqueConstraint(name = "uk_city_district_name", columnNames = {"district_id", "name"}))
+@Table(name = "cities", schema = "public")
 @Getter @Setter @NoArgsConstructor
 public class City {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
-    @NotNull @Column(name = "district_id", nullable = false)
-    private Long districtId;
+    @NotNull
+    @Column(name = "country_id", nullable = false)
+    private Long countryId;
 
-    @Size(max = 20) @Column(length = 20)
-    private String code;
+    @Column(name = "administrative_area_id")
+    private Long administrativeAreaId;
 
-    @NotBlank @Size(max = 100) @Column(nullable = false, length = 100)
+    @NotBlank
+    @Size(max = 200)
+    @Column(nullable = false, length = 200)
     private String name;
 
-    @Size(max = 10) @Column(name = "postal_code", length = 10)
-    private String postalCode;
+    @Column(precision = 10, scale = 7)
+    private BigDecimal latitude;
 
-    @Column(name = "display_order", nullable = false)
-    private Integer displayOrder = 0;
+    @Column(precision = 10, scale = 7)
+    private BigDecimal longitude;
 
-    @NotNull @Column(nullable = false)
+    @NotNull
+    @Column(nullable = false)
     private Boolean active = true;
 
-    @CreationTimestamp @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp @Column(name = "updated_at")
+    @UpdateTimestamp
+    @Column(name = "updated_at")
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDateTime updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "country_id", insertable = false, updatable = false)
+    private Country country;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "administrative_area_id", insertable = false, updatable = false)
+    private AdministrativeArea administrativeArea;
+
+    public Long getDistrictId() {
+        return administrativeAreaId;
+    }
+
+    public void setDistrictId(Long districtId) {
+        this.administrativeAreaId = districtId;
+    }
+
+    public String getCode() {
+        return null;
+    }
+
+    public void setCode(String code) {
+    }
+
+    public String getPostalCode() {
+        return null;
+    }
+
+    public void setPostalCode(String postalCode) {
+    }
+
+    public Integer getDisplayOrder() {
+        return 0;
+    }
+
+    public void setDisplayOrder(Integer displayOrder) {
+    }
 }

@@ -157,7 +157,7 @@ public class EventReviewService {
             Long reviewerUserId,
             String reason,
             LocalDateTime reviewedAt) {
-        if (event.getStatus() != EventStatus.UNDER_REVIEW) {
+        if (!isAllowedTransition(event.getStatus(), decision)) {
             throw new InvalidEventTransitionException(
                     "Event " + event.getId() + " cannot be " + decision.name().toLowerCase()
                             + " because its current status is " + event.getStatus());
@@ -171,7 +171,7 @@ public class EventReviewService {
 
     private List<String> allowedActions(EventStatus status) {
         return switch (status) {
-            case SUBMITTED -> List.of("START_REVIEW");
+            case SUBMITTED -> List.of("START_REVIEW", "APPROVE", "REJECT");
             case UNDER_REVIEW -> List.of("APPROVE", "REJECT");
             case APPROVED -> List.of("PUBLISH");
             case PUBLISHED -> List.of("OPEN_REGISTRATION", "CANCEL");
@@ -190,7 +190,8 @@ public class EventReviewService {
 
     private boolean isAllowedTransition(EventStatus current, EventStatus target) {
         return switch (current) {
-            case SUBMITTED -> target == EventStatus.UNDER_REVIEW;
+            case SUBMITTED -> target == EventStatus.UNDER_REVIEW
+                    || target == EventStatus.APPROVED || target == EventStatus.REJECTED;
             case UNDER_REVIEW -> target == EventStatus.APPROVED || target == EventStatus.REJECTED;
             case APPROVED -> target == EventStatus.PUBLISHED;
             case PUBLISHED -> target == EventStatus.REGISTRATION_OPEN || target == EventStatus.CANCELLED;

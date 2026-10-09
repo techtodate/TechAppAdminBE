@@ -8,4 +8,8 @@ public class ResourceNotFoundException extends RuntimeException {
     public ResourceNotFoundException(String resource, String key) {
         super(resource + " '" + key + "' was not found");
     }
+
+    public ResourceNotFoundException(String message) {
+        super(message);
+    }
 }

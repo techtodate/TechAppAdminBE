@@ -32,6 +32,16 @@ public class ApiExceptionHandler {
         return response(HttpStatus.CONFLICT, ex.getMessage());
     }
 
+    @ExceptionHandler(InstitutionException.class)
+    ResponseEntity<Map<String, Object>> institutionException(InstitutionException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now());
+        body.put("status", ex.getStatus().value());
+        body.put("error", ex.getErrorCode());
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(ex.getStatus()).body(body);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<Map<String, Object>> badRequest(IllegalArgumentException ex) {
         return response(HttpStatus.BAD_REQUEST, ex.getMessage());
@@ -39,7 +49,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<Map<String, Object>> conflict(DataIntegrityViolationException ex) {
-        return response(HttpStatus.CONFLICT, "The record conflicts with an existing record or is still referenced");
+        String detail = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        return response(HttpStatus.CONFLICT, "Database constraint violation: " + detail);
     }
 
     private ResponseEntity<Map<String, Object>> response(HttpStatus status, String message) {
