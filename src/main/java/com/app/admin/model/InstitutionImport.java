@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -24,6 +25,13 @@ public class InstitutionImport {
     @NotNull
     @Column(name = "country_id", nullable = false)
     private Long countryId;
+
+    @Size(max = 3)
+    @Column(name = "country_code", length = 3)
+    private String countryCode;
+
+    @Column(name = "ignore_duplicate_check", nullable = false)
+    private boolean ignoreDuplicateCheck = false;
 
     @NotNull
     @Column(name = "source_id", nullable = false)
@@ -86,6 +94,11 @@ public class InstitutionImport {
     @Column(name = "created_at", updatable = false)
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private LocalDateTime updatedAt;
 
     @Column(name = "applied_at")
     private LocalDateTime appliedAt;
@@ -186,7 +199,4 @@ public class InstitutionImport {
         // backward compatibility
     }
 
-    public LocalDateTime getUpdatedAt() {
-        return appliedAt != null ? appliedAt : (completedAt != null ? completedAt : createdAt);
-    }
 }

@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.app.admin.model.TechUpdate;
+import com.app.admin.dto.CreateTechUpdateRequest;
+import com.app.admin.dto.UpdateTechUpdateRequest;
 import com.app.admin.service.TechUpdateService;
 
 import jakarta.validation.Valid;
@@ -39,8 +41,8 @@ public class TechUpdateController {
     }
 
     @PostMapping
-    public ResponseEntity<TechUpdate> create(@Valid @RequestBody TechUpdate request) {
-        TechUpdate created = service.create(request);
+    public ResponseEntity<TechUpdate> create(@Valid @RequestBody CreateTechUpdateRequest request) {
+        TechUpdate created = service.createManualRecord(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
                 .buildAndExpand(created.getId())
@@ -50,7 +52,7 @@ public class TechUpdateController {
 
     @PutMapping("/{id}")
     public ResponseEntity<TechUpdate> update(
-            @PathVariable Long id, @Valid @RequestBody TechUpdate request) {
+            @PathVariable Long id, @Valid @RequestBody UpdateTechUpdateRequest request) {
         return ResponseEntity.ok(service.update(id, request));
     }
 

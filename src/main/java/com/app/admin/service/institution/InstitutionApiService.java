@@ -67,8 +67,12 @@ public class InstitutionApiService {
     }
     public Map<String, Object> institution(Institution value) {
         return values("id", value.getId(), "name", value.getName(), "short_name", value.getShortName(),
-                "institution_type", value.getInstitutionType(), "country_id", value.getCountryId(), "country", country(value.getCountry()),
-                "administrative_area_id", value.getAdministrativeAreaId(), "administrative_area", value.getAdministrativeArea() == null ? null : values("id", value.getAdministrativeArea().getId(), "name", value.getAdministrativeArea().getName()),
+                "institution_type", value.getInstitutionType(), "country_id", value.getCountryId(), "country", value.getCountryCode(),
+                "administrative_area_id", value.getAdministrativeAreaId(), "administrative_area", value.getAdministrativeAreaCode(),
+                "administrative_area_details", value.getAdministrativeArea() == null ? null : values("id", value.getAdministrativeArea().getId(), "name", value.getAdministrativeArea().getName()),
+                "country_code", value.getCountryCode(), "administrative_area_code", value.getAdministrativeAreaCode(),
+                "sub_administrative_area", value.getSubAdministrativeArea(), "location_id", value.getLocationId(),
+                "state_id", value.getAdministrativeAreaId(),
                 "city_id", value.getCityId(), "city", value.getCity() == null ? null : values("id", value.getCity().getId(), "name", value.getCity().getName()),
                 "address", value.getAddress(), "website", value.getWebsite(), "verification_status", value.getVerificationStatus(),
                 "active", value.getActive(), "source", source(value.getSource()), "source_identifier", value.getSourceIdentifier(),
@@ -107,9 +111,6 @@ public class InstitutionApiService {
                 "countries_with_sources", all.stream().map(InstitutionSource::getCountryId).distinct().count(),
                 "total_imports", imports.count(), "recent_imports", recent.getContent().stream().map(this::importView).toList());
     }
-    public List<Map<String, Object>> fields() {
-        viewPermission(); return fields.findAll(Sort.by("displayOrder", "id")).stream().map(f -> values("id", f.getId(), "field_code", f.getFieldCode(), "field_name", f.getFieldName(), "is_required", f.getIsRequired(), "active", f.getActive())).toList();
-    }
     public List<Map<String, Object>> mappings(Long sourceId) {
         viewPermission(); return (sourceId == null ? mappings.findAll() : mappings.findBySourceId(sourceId)).stream().map(this::mapping).toList();
     }
@@ -125,7 +126,6 @@ public class InstitutionApiService {
         for (SaveInstitutionMapping row : request) {
             if (!names.add(row.sourceFieldName().trim().toLowerCase(Locale.ROOT))) throw new IllegalArgumentException("Source field names must be unique");
             if (!valid.containsKey(row.standardFieldCode()) || !destinations.add(row.standardFieldCode())) throw new IllegalArgumentException("Destination fields must be valid and unique");
-            StandardFieldCode.valueOf(row.standardFieldCode());
             if (row.transformationRule() != null && !row.transformationRule().isBlank()) TransformationRule.valueOf(row.transformationRule());
         }
         if (!destinations.containsAll(List.of("SOURCE_IDENTIFIER", "NAME")) || valid.values().stream().anyMatch(f -> Boolean.TRUE.equals(f.getIsRequired()) && !destinations.contains(f.getFieldCode()))) throw new IllegalArgumentException("Source identifier, name and all required fields must be mapped");
@@ -143,13 +143,14 @@ public class InstitutionApiService {
         return mappings.saveAll(saved).stream().map(this::mapping).toList();
     }
     public Map<String, Object> importView(InstitutionImport value) {
-        return values("id", value.getId(), "country_id", value.getCountryId(), "country", countries.findById(value.getCountryId()).map(this::country).orElse(null),
+        return values("id", value.getId(), "country_id", value.getCountryId(), "country_code", value.getCountryCode(), "country", countries.findById(value.getCountryId()).map(this::country).orElse(null),
                 "source_id", value.getSourceId(), "source", sources.findById(value.getSourceId()).map(this::source).orElse(null),
+                "ignore_duplicate_check", value.isIgnoreDuplicateCheck(),
                 "version", value.getVersion(), "import_type", value.getImportType(), "file_name", value.getFileName(), "status", value.getStatus(),
                 "started_at", value.getStartedAt(), "completed_at", value.getCompletedAt(), "created_at", value.getCreatedAt(),
                 "total_records", value.getTotalRecords(), "valid_records", value.getValidRecords(), "new_count", value.getNewCount(),
                 "inserted_count", value.getStatus() == ImportStatus.COMPLETED ? value.getInsertedCount() : 0,
-                "updated_count", value.getUpdatedCount(), "unchanged_count", value.getUnchangedCount(), "duplicate_count", value.getDuplicateCount(), "error_count", value.getErrorCount());
+                "updated_count", value.getUpdatedCount(), "unchanged_count", value.getUnchangedCount(), "duplicate_count", value.getDuplicateCount(), "error_count", value.getErrorCount(), "error_message", value.getErrorMessage());
     }
     public Map<String, Object> getImport(Long id) { viewPermission(); return importView(workflow.getImport(id)); }
     public Map<String, Object> preview(Long id) { viewPermission(); return preview(workflow.previewImport(id)); }
@@ -191,8 +192,8 @@ public class InstitutionApiService {
     }
     @Transactional public Map<String, Object> create(CreateInstitutionImportRequest request) { return importView(workflow.createImport(request)); }
     @Transactional public Map<String, Object> upload(Long id, org.springframework.web.multipart.MultipartFile file) { return importView(workflow.uploadSourceFile(id, file)); }
-    @Transactional public Map<String, Object> validate(Long id) { return preview(workflow.validateImport(id)); }
-    @Transactional public Map<String, Object> apply(Long id) { return importView(workflow.applyImport(id)); }
+    @Transactional public Map<String, Object> validate(Long id) { return importView(workflow.queueValidation(id)); }
+    @Transactional public Map<String, Object> apply(Long id) { return importView(workflow.queueApply(id)); }
     @Transactional public Map<String, Object> cancel(Long id) { return importView(workflow.cancelImport(id)); }
     @Transactional public Map<String, Object> resolve(Long id, Long matchId, boolean merge) { return match(merge ? workflow.mergeDuplicate(id, matchId) : workflow.keepDuplicateSeparate(id, matchId)); }
 }

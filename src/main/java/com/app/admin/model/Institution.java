@@ -44,9 +44,23 @@ public class Institution {
     @Column(name = "institution_type", length = 100)
     private String institutionType;
 
-    @NotNull
-    @Column(name = "country_id", nullable = false)
+    @Column(name = "country_id")
     private Long countryId;
+
+    @Size(max = 10)
+    @Column(name = "country_code", length = 10)
+    private String countryCode;
+
+    @Size(max = 200)
+    @Column(name = "administrative_area", length = 200)
+    private String administrativeAreaCode;
+
+    @Size(max = 100)
+    @Column(name = "sub_administrative_area", length = 100)
+    private String subAdministrativeArea;
+
+    @Column(name = "location_id")
+    private Long locationId;
 
     @Column(name = "administrative_area_id")
     private Long administrativeAreaId;
@@ -93,7 +107,7 @@ public class Institution {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "administrative_area_id", insertable = false, updatable = false)
-    private AdministrativeArea administrativeArea;
+    private State administrativeArea;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "city_id", insertable = false, updatable = false)
@@ -109,20 +123,22 @@ public class Institution {
     @JoinColumn(name = "source_id", insertable = false, updatable = false)
     private InstitutionSource source;
 
-    public Long getStateId() {
-        return administrativeAreaId;
-    }
-
-    public void setStateId(Long stateId) {
-        this.administrativeAreaId = stateId;
-    }
-
     public String getCityName() {
         return cityName != null ? cityName : city != null ? city.getName() : null;
     }
 
     public void setCityName(String cityName) {
         this.cityName = cityName;
+    }
+
+    /** Backwards-compatible alias; the value is stored in administrative_area_id. */
+    @Transient
+    public Long getStateId() {
+        return administrativeAreaId;
+    }
+
+    public void setStateId(Long stateId) {
+        this.administrativeAreaId = stateId;
     }
 
     public String getNormalizedWebsite() {

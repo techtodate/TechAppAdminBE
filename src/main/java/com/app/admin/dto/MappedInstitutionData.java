@@ -3,6 +3,7 @@ package com.app.admin.dto;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -17,12 +18,14 @@ public class MappedInstitutionData {
     private String institutionType;
     private String country;
     private String administrativeArea;
+    private String countryCode;
+    private String administrativeAreaCode;
+    private String subAdministrativeArea;
+    private Long locationId;
     private String city;
     private String address;
     private String website;
     private String normalizedWebsite;
-    private Long countryId;
-    private Long stateId;
-    private Long cityId;
     private String resolvedCityName;
+    private Map<String, String> additionalFields;
 }

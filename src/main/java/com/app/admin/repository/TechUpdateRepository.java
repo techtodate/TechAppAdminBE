@@ -7,4 +7,5 @@ import com.app.admin.model.TechUpdate;
 
 @Repository
 public interface TechUpdateRepository extends JpaRepository<TechUpdate, Long> {
+    boolean existsBySourceUrl(String sourceUrl);
 }

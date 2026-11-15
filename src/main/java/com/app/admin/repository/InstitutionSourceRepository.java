@@ -17,4 +17,6 @@ public interface InstitutionSourceRepository extends JpaRepository<InstitutionSo
     Optional<InstitutionSource> findByCountryIdAndCodeIgnoreCase(@Param("countryId") Long countryId, @Param("code") String code);
     @Query("select s from InstitutionSource s where lower(s.sourceCode) = lower(:code)")
     Optional<InstitutionSource> findByCodeIgnoreCase(@Param("code") String code);
+    boolean existsByCountryIdAndSourceCodeIgnoreCase(Long countryId, String sourceCode);
+    boolean existsByCountryIdAndSourceCodeIgnoreCaseAndIdNot(Long countryId, String sourceCode, Long id);
 }

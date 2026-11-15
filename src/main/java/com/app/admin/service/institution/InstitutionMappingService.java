@@ -6,7 +6,8 @@ import org.springframework.stereotype.Service;
 import com.app.admin.dto.MappedInstitutionData;
 import com.app.admin.dto.SourceRow;
 import com.app.admin.exception.InstitutionException;
-import com.app.admin.model.*;
+import com.app.admin.model.InstitutionSourceMapping;
+import com.app.admin.model.TransformationRule;
 import com.app.admin.repository.InstitutionSourceMappingRepository;
 
 @Service
@@ -33,10 +34,7 @@ public class InstitutionMappingService {
         return mappings;
     }
 
-    public MappedInstitutionData mapRow(
-            SourceRow row,
-            List<InstitutionSourceMapping> mappings,
-            Country defaultCountry) {
+    public MappedInstitutionData mapRow(SourceRow row, List<InstitutionSourceMapping> mappings) {
         Map<String, String> values = row.values();
 
         // Create a case-insensitive lookup map of row values
@@ -44,9 +42,7 @@ public class InstitutionMappingService {
         lookup.putAll(values);
 
         MappedInstitutionData.MappedInstitutionDataBuilder builder = MappedInstitutionData.builder();
-        String countryVal = null;
-        String adminAreaVal = null;
-        String cityVal = null;
+        Map<String, String> additionalFields = new LinkedHashMap<>();
 
         for (InstitutionSourceMapping mapping : mappings) {
             String sourceField = mapping.getSourceFieldName();
@@ -56,69 +52,47 @@ public class InstitutionMappingService {
             }
 
             String transformed = applyTransformation(rawVal, mapping.getTransformationRule() == null || mapping.getTransformationRule().isBlank() ? null : TransformationRule.valueOf(mapping.getTransformationRule().toUpperCase(Locale.ROOT)));
-            StandardFieldCode code = StandardFieldCode.valueOf(mapping.getStandardFieldCode());
+            String code = mapping.getStandardFieldCode();
 
             switch (code) {
-                case SOURCE_IDENTIFIER -> builder.sourceIdentifier(transformed);
-                case NAME -> {
-                    builder.name(normalizationService.normalizeDisplayName(rawVal));
-                    builder.normalizedName(normalizationService.createMatchNormalizedName(rawVal));
+                case "SOURCE_IDENTIFIER" -> builder.sourceIdentifier(transformed);
+                case "NAME" -> {
+                    String nameFromFirstLetter = stripLeadingNonLetters(rawVal);
+                    builder.name(normalizationService.normalizeDisplayName(nameFromFirstLetter));
+                    builder.normalizedName(normalizationService.createMatchNormalizedName(nameFromFirstLetter));
                 }
-                case SHORT_NAME -> builder.shortName(transformed);
-                case INSTITUTION_TYPE -> builder.institutionType(transformed);
-                case COUNTRY -> countryVal = transformed;
-                case ADMINISTRATIVE_AREA -> adminAreaVal = transformed;
-                case CITY -> cityVal = transformed;
-                case ADDRESS -> builder.address(transformed);
-                case WEBSITE -> {
-                    builder.website(normalizationService.normalizeWebsite(rawVal));
-                    builder.normalizedWebsite(normalizationService.createNormalizedWebsite(rawVal));
+                case "SHORT_NAME" -> builder.shortName(transformed);
+                case "INSTITUTION_TYPE" -> builder.institutionType(transformed);
+                case "COUNTRY" -> { builder.country(transformed); builder.countryCode(transformed); }
+                case "COUNTRY_CODE" -> builder.countryCode(transformed);
+                case "ADMINISTRATIVE_AREA" -> { builder.administrativeArea(transformed); builder.administrativeAreaCode(transformed); }
+                case "ADMINISTRATIVE_AREA_CODE" -> builder.administrativeAreaCode(transformed);
+                case "SUB_ADMINISTRATIVE_AREA" -> builder.subAdministrativeArea(transformed);
+                case "CITY" -> { builder.city(transformed); builder.resolvedCityName(transformed); }
+                case "LOCATION_ID" -> {
+                    if (transformed != null && !transformed.isBlank()) {
+                        try { builder.locationId(Long.valueOf(transformed)); }
+                        catch (NumberFormatException ex) { throw new IllegalArgumentException("LOCATION_ID must be a whole number"); }
+                    }
                 }
+                case "ADDRESS" -> builder.address(transformed);
+                case "WEBSITE" -> {
+                    builder.website(rawVal);
+                    builder.normalizedWebsite(null);
+                }
+                default -> additionalFields.put(code, transformed);
             }
         }
 
-        // Location resolution
-        Long countryId = defaultCountry != null ? defaultCountry.getId() : null;
-        if (countryVal != null && !countryVal.isBlank()) {
-            Optional<Country> resolvedCountry = normalizationService.resolveCountry(countryVal);
-            if (resolvedCountry.isPresent()) {
-                countryId = resolvedCountry.get().getId();
-                builder.country(resolvedCountry.get().getName());
-            } else {
-                builder.country(countryVal);
-            }
-        } else if (defaultCountry != null) {
-            builder.country(defaultCountry.getName());
-        }
-        builder.countryId(countryId);
-
-        Long stateId = null;
-        if (countryId != null && adminAreaVal != null && !adminAreaVal.isBlank()) {
-            Optional<AdministrativeArea> resolvedState = normalizationService.resolveState(countryId, adminAreaVal);
-            if (resolvedState.isPresent()) {
-                stateId = resolvedState.get().getId();
-                builder.administrativeArea(resolvedState.get().getName());
-            } else {
-                builder.administrativeArea(adminAreaVal);
-            }
-        }
-        builder.stateId(stateId);
-
-        Long cityId = null;
-        if (cityVal != null && !cityVal.isBlank()) {
-            Optional<City> resolvedCity = normalizationService.resolveCity(countryId, stateId, cityVal);
-            if (resolvedCity.isPresent()) {
-                cityId = resolvedCity.get().getId();
-                builder.resolvedCityName(resolvedCity.get().getName());
-                builder.city(resolvedCity.get().getName());
-            } else {
-                builder.city(cityVal);
-                builder.resolvedCityName(cityVal);
-            }
-        }
-        builder.cityId(cityId);
+        // Keep imported values as supplied; do not resolve or persist master IDs.
+        builder.additionalFields(additionalFields);
 
         return builder.build();
+    }
+
+    private String stripLeadingNonLetters(String value) {
+        if (value == null) return null;
+        return value.replaceFirst("^[^\\p{L}]+", "");
     }
 
     public String applyTransformation(String value, TransformationRule rule) {

@@ -35,7 +35,7 @@ public class InstitutionStandardField {
     private String dataType = "STRING";
 
     @NotNull
-    @Column(name = "is_required", nullable = false)
+    @Column(name = "required", nullable = false)
     private Boolean isRequired = false;
 
     @Size(max = 500)

@@ -41,11 +41,12 @@ public class InstitutionSource {
     @Column(name = "source_type", nullable = false, length = 50)
     private String sourceType = "GOVERNMENT";
 
-    @Size(max = 500)
-    @Column(name = "source_url", length = 500)
+    @Size(max = 1000)
+    @Column(name = "source_url", length = 1000)
     private String sourceUrl;
 
-    @Transient
+    @Size(max = 500)
+    @Column(name = "description", length = 500)
     private String description;
 
     @NotBlank

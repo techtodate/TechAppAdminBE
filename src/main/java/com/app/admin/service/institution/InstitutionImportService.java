@@ -90,10 +90,17 @@ public class InstitutionImportService {
             throw InstitutionException.invalidSourceCountry(source.getId(), country.getId());
         }
         if (!Boolean.TRUE.equals(country.getActive()) || !Boolean.TRUE.equals(source.getActive())) throw new IllegalArgumentException("Country and source must be active");
+        String countryCode = request.countryCode() == null || request.countryCode().isBlank()
+                ? country.getIsoCode() : request.countryCode().trim();
+        if (!country.getIsoCode().equalsIgnoreCase(countryCode)) {
+            throw new IllegalArgumentException("country_code must match the selected country");
+        }
 
         InstitutionImport imp = new InstitutionImport();
         imp.setCountryId(country.getId());
+        imp.setCountryCode(countryCode);
         imp.setSourceId(source.getId());
+        imp.setIgnoreDuplicateCheck(Boolean.TRUE.equals(request.ignoreDuplicateCheck()));
         imp.setFileName(request.fileName() != null && !request.fileName().isBlank() ? request.fileName().trim() : "pending_upload");
         imp.setFilePath("pending_upload");
         imp.setFileChecksum("pending_upload");
@@ -158,9 +165,17 @@ public class InstitutionImportService {
     }
 
     @Transactional
-    public ImportPreviewResponse validateImport(Long importId) {
+    public InstitutionImport queueValidation(Long importId) {
         securityContext.requirePermission(AdminSecurityContext.PERMISSION_INSTITUTION_IMPORT);
+        InstitutionImport imp = lockedImport(importId);
+        if (imp.getStatus() != ImportStatus.UPLOADED && imp.getStatus() != ImportStatus.READY_FOR_REVIEW && imp.getStatus() != ImportStatus.VALIDATION_COMPLETED) throw InstitutionException.importNotReady(imp.getStatus().name());
+        imp.setStatus(ImportStatus.PROCESSING);
+        imp.setStartedAt(LocalDateTime.now());
+        return importRepository.saveAndFlush(imp);
+    }
 
+    @Transactional
+    public ImportPreviewResponse validateImport(Long importId) {
         InstitutionImport imp = lockedImport(importId);
         if (imp.getStatus() == ImportStatus.CREATED) {
             throw InstitutionException.importNotReady("File has not been uploaded yet");
@@ -172,7 +187,7 @@ public class InstitutionImportService {
             throw InstitutionException.importAlreadyCancelled(importId);
         }
 
-        if (imp.getStatus() != ImportStatus.UPLOADED && imp.getStatus() != ImportStatus.READY_FOR_REVIEW && imp.getStatus() != ImportStatus.VALIDATION_COMPLETED) throw InstitutionException.importNotReady(imp.getStatus().name());
+        if (imp.getStatus() != ImportStatus.PROCESSING) throw InstitutionException.importNotReady(imp.getStatus().name());
         imp.setStatus(ImportStatus.PROCESSING);
         imp.setStartedAt(LocalDateTime.now());
         importRepository.saveAndFlush(imp);
@@ -224,7 +239,8 @@ public class InstitutionImportService {
                 Map<String, Object> rawMap = new LinkedHashMap<>(row.values());
                 rec.setRawData(rawMap);
 
-                MappedInstitutionData mapped = mappingService.mapRow(row, mappings, country);
+                MappedInstitutionData mapped = mappingService.mapRow(row, mappings);
+                mapped.setCountryCode(imp.getCountryCode());
                 rec.setSourceIdentifier(mapped.getSourceIdentifier());
 
                 @SuppressWarnings("unchecked")
@@ -244,7 +260,9 @@ public class InstitutionImportService {
                 rec.setValidationStatus(ValidationStatus.VALID);
                 valid++;
 
-                DuplicateCheckResult dcr = duplicateDetectionService.checkForDuplicates(source.getId(), mapped);
+                DuplicateCheckResult dcr = imp.isIgnoreDuplicateCheck()
+                        ? DuplicateCheckResult.of(RecordClassification.NEW, null)
+                        : duplicateDetectionService.checkForDuplicates(source.getId(), mapped);
                 rec.setClassification(dcr.classification());
                 rec.setTargetInstitutionId(dcr.targetInstitutionId());
 
@@ -260,7 +278,7 @@ public class InstitutionImportService {
                             InstitutionImportRecordMatch matchEntity = new InstitutionImportRecordMatch();
                             matchEntity.setImportRecordId(rec.getId());
                             matchEntity.setMatchedInstitutionId(match.institutionId());
-                            matchEntity.setMatchScore(java.math.BigDecimal.valueOf(match.score()));
+                            matchEntity.setMatchScore(match.score());
                             matchEntity.setMatchConfidence(match.confidence());
                             matchEntity.setMatchReason(match.reason());
                             matchEntity.setResolutionStatus(ResolutionStatus.PENDING);
@@ -318,9 +336,16 @@ public class InstitutionImportService {
     }
 
     @Transactional
-    public InstitutionImport applyImport(Long importId) {
+    public InstitutionImport queueApply(Long importId) {
         securityContext.requirePermission(AdminSecurityContext.PERMISSION_INSTITUTION_IMPORT);
+        InstitutionImport imp = lockedImport(importId);
+        if (imp.getStatus() != ImportStatus.READY_FOR_REVIEW && imp.getStatus() != ImportStatus.VALIDATION_COMPLETED) throw InstitutionException.importNotReady(imp.getStatus().name());
+        imp.setStatus(ImportStatus.IMPORTING);
+        return importRepository.saveAndFlush(imp);
+    }
 
+    @Transactional
+    public InstitutionImport applyImport(Long importId) {
         InstitutionImport imp = lockedImport(importId);
         if (imp.getStatus() == ImportStatus.COMPLETED) {
             throw InstitutionException.importAlreadyApplied(importId);
@@ -328,7 +353,7 @@ public class InstitutionImportService {
         if (imp.getStatus() == ImportStatus.CANCELLED) {
             throw InstitutionException.importAlreadyCancelled(importId);
         }
-        if (imp.getStatus() != ImportStatus.READY_FOR_REVIEW && imp.getStatus() != ImportStatus.VALIDATION_COMPLETED) {
+        if (imp.getStatus() != ImportStatus.IMPORTING) {
             throw InstitutionException.importNotReady(imp.getStatus().name());
         }
 
@@ -353,9 +378,10 @@ public class InstitutionImportService {
                 inst.setNormalizedName(data.getNormalizedName());
                 inst.setShortName(data.getShortName());
                 inst.setInstitutionType(data.getInstitutionType());
-                inst.setCountryId(data.getCountryId());
-                inst.setStateId(data.getStateId());
-                inst.setCityId(data.getCityId());
+                inst.setCountryCode(data.getCountryCode());
+                inst.setAdministrativeAreaCode(data.getAdministrativeAreaCode());
+                inst.setSubAdministrativeArea(data.getSubAdministrativeArea());
+                inst.setLocationId(data.getLocationId());
                 inst.setCityName(data.getResolvedCityName());
                 inst.setAddress(data.getAddress());
                 inst.setWebsite(data.getWebsite());
@@ -401,13 +427,16 @@ public class InstitutionImportService {
                         }
                         if (data.getShortName() != null) inst.setShortName(data.getShortName());
                         if (data.getInstitutionType() != null) inst.setInstitutionType(data.getInstitutionType());
+                        if (data.getCountryCode() != null) inst.setCountryCode(data.getCountryCode());
+                        if (data.getSubAdministrativeArea() != null) inst.setSubAdministrativeArea(data.getSubAdministrativeArea());
+                        if (data.getLocationId() != null) inst.setLocationId(data.getLocationId());
+                        if (data.getAdministrativeAreaCode() != null) inst.setAdministrativeAreaCode(data.getAdministrativeAreaCode());
                         if (data.getAddress() != null) inst.setAddress(data.getAddress());
                         if (data.getWebsite() != null) {
                             inst.setWebsite(data.getWebsite());
                             inst.setNormalizedWebsite(data.getNormalizedWebsite());
                         }
-                        if (data.getStateId() != null) inst.setStateId(data.getStateId());
-                        if (data.getCityId() != null) inst.setCityId(data.getCityId());
+                        if (data.getCity() != null) inst.setCityName(data.getCity());
                         institutionRepository.save(inst);
 
                         // Update or insert source record
@@ -472,6 +501,9 @@ public class InstitutionImportService {
         if (imp.getStatus() == ImportStatus.CANCELLED) {
             throw InstitutionException.importAlreadyCancelled(importId);
         }
+        if (imp.getStatus() == ImportStatus.PROCESSING || imp.getStatus() == ImportStatus.IMPORTING) {
+            throw InstitutionException.importNotReady("An import job is running and cannot be cancelled");
+        }
 
         imp.setStatus(ImportStatus.CANCELLED);
         return importRepository.save(imp);
@@ -484,6 +516,15 @@ public class InstitutionImportService {
 
     private InstitutionImport lockedImport(Long id) {
         return importRepository.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Institution import", id));
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void markJobFailed(Long importId, String reason) {
+        InstitutionImport imp = importRepository.findForUpdate(importId).orElse(null);
+        if (imp == null || (imp.getStatus() != ImportStatus.PROCESSING && imp.getStatus() != ImportStatus.IMPORTING)) return;
+        imp.setStatus(ImportStatus.FAILED);
+        imp.setErrorMessage(reason == null || reason.isBlank() ? "Background import job failed" : reason);
+        importRepository.save(imp);
     }
 
     Path uploadedFile(InstitutionImport item) {
@@ -538,7 +579,7 @@ public class InstitutionImportService {
         if (record.getClassification() != RecordClassification.DUPLICATE || record.getTargetInstitutionId() != null) throw InstitutionException.importNotReady("Duplicate record has already been resolved");
 
         match.setResolutionStatus(ResolutionStatus.MERGED);
-        match.setResolvedBy(securityContext.getCurrentUserId());
+        match.setResolvedBy(String.valueOf(securityContext.getCurrentUserId()));
         match.setResolvedAt(LocalDateTime.now());
         matchRepository.save(match);
 
@@ -566,7 +607,7 @@ public class InstitutionImportService {
         if (record.getClassification() != RecordClassification.DUPLICATE || record.getTargetInstitutionId() != null) throw InstitutionException.importNotReady("Duplicate record has already been resolved");
 
         match.setResolutionStatus(ResolutionStatus.KEPT_SEPARATE);
-        match.setResolvedBy(securityContext.getCurrentUserId());
+        match.setResolvedBy(String.valueOf(securityContext.getCurrentUserId()));
         match.setResolvedAt(LocalDateTime.now());
         matchRepository.save(match);
 

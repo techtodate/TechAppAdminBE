@@ -8,7 +8,7 @@ import com.app.admin.model.Country;
 
 @Repository
 public interface CountryRepository extends JpaRepository<Country, Long> {
-    @Query("select c from Country c where lower(c.isoCode) = lower(:code) or lower(c.iso3Code) = lower(:code)")
+    @Query("select c from Country c where lower(c.isoCode) = lower(:code)")
     Optional<Country> findByCodeIgnoreCase(@Param("code") String code);
     Optional<Country> findByNameIgnoreCase(String name);
 }

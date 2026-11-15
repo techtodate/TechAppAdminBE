@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -11,9 +13,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
     @ExceptionHandler(ResourceNotFoundException.class)
     ResponseEntity<Map<String, Object>> notFound(ResourceNotFoundException ex) {
         return response(HttpStatus.NOT_FOUND, ex.getMessage());
@@ -21,10 +26,19 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<Map<String, Object>> validation(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+        Map<String, String> fields = new LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(error ->
+                fields.putIfAbsent(error.getField(), error.getDefaultMessage()));
+        String message = fields.entrySet().stream()
+                .map(error -> error.getKey() + ": " + error.getValue())
                 .collect(Collectors.joining(", "));
-        return response(HttpStatus.BAD_REQUEST, message);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", HttpStatus.BAD_REQUEST.getReasonPhrase());
+        body.put("message", message);
+        body.put("fieldErrors", fields);
+        return ResponseEntity.badRequest().body(body);
     }
 
     @ExceptionHandler(InvalidEventTransitionException.class)
@@ -49,8 +63,16 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<Map<String, Object>> conflict(DataIntegrityViolationException ex) {
-        String detail = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
-        return response(HttpStatus.CONFLICT, "Database constraint violation: " + detail);
+        Throwable rootCause = ex;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) rootCause = rootCause.getCause();
+        log.error("Database integrity violation: {}", rootCause.getMessage());
+        return response(HttpStatus.CONFLICT, "The request conflicts with an existing or required database record.");
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    ResponseEntity<Map<String, Object>> status(ResponseStatusException ex) {
+        HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
+        return response(status, ex.getReason() == null ? status.getReasonPhrase() : ex.getReason());
     }
 
     private ResponseEntity<Map<String, Object>> response(HttpStatus status, String message) {

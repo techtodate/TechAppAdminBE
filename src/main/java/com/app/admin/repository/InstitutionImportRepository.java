@@ -14,4 +14,5 @@ public interface InstitutionImportRepository extends JpaRepository<InstitutionIm
     java.util.Optional<InstitutionImport> findForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
     Page<InstitutionImport> findAllByOrderByCreatedAtDesc(Pageable pageable);
     List<InstitutionImport> findBySourceIdOrderByCreatedAtDesc(Long sourceId);
+    java.util.Optional<InstitutionImport> findFirstBySourceIdOrderByCreatedAtDesc(Long sourceId);
 }

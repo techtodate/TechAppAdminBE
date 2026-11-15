@@ -8,10 +8,10 @@ import org.springframework.stereotype.Service;
 
 import com.app.admin.model.City;
 import com.app.admin.model.Country;
-import com.app.admin.model.AdministrativeArea;
+import com.app.admin.model.State;
 import com.app.admin.repository.CityRepository;
 import com.app.admin.repository.CountryRepository;
-import com.app.admin.repository.AdministrativeAreaRepository;
+import com.app.admin.repository.StateRepository;
 
 @Service
 public class InstitutionNormalizationService {
@@ -20,16 +20,16 @@ public class InstitutionNormalizationService {
     private static final Pattern PUNCTUATION_STRIP = Pattern.compile("[^a-zA-Z0-9\\s]");
 
     private final CountryRepository countryRepository;
-    private final AdministrativeAreaRepository areaRepository;
+    private final StateRepository stateRepository;
     private final CityRepository cityRepository;
 
     public InstitutionNormalizationService(
             CountryRepository countryRepository,
-            AdministrativeAreaRepository areaRepository,
-            CityRepository cityRepository) {
+            CityRepository cityRepository,
+            StateRepository stateRepository) {
         this.countryRepository = countryRepository;
-        this.areaRepository = areaRepository;
         this.cityRepository = cityRepository;
+        this.stateRepository = stateRepository;
     }
 
     /**
@@ -111,18 +111,45 @@ public class InstitutionNormalizationService {
         String trimmed = countryStr.trim();
         Optional<Country> byCode = countryRepository.findByCodeIgnoreCase(trimmed);
         if (byCode.isPresent()) return byCode;
+        // The country master stores ISO-3 codes. Preserve import support for ISO-2 values.
+        if (trimmed.length() == 2) {
+            try {
+                String iso3 = new java.util.Locale.Builder().setRegion(trimmed).build().getISO3Country();
+                if (!iso3.isBlank()) {
+                    byCode = countryRepository.findByCodeIgnoreCase(iso3);
+                    if (byCode.isPresent()) return byCode;
+                }
+            } catch (java.util.IllformedLocaleException | java.util.MissingResourceException ignored) {
+                // Fall through to an exact country-name lookup.
+            }
+        }
         return countryRepository.findByNameIgnoreCase(trimmed);
     }
 
     /**
      * Resolves Administrative Area (State) by code or name within a country.
      */
-    public Optional<AdministrativeArea> resolveState(Long countryId, String stateStr) {
+    public Optional<State> resolveState(Long countryId, String stateStr) {
         if (countryId == null || stateStr == null || stateStr.trim().isEmpty()) return Optional.empty();
         String trimmed = stateStr.trim();
-        Optional<AdministrativeArea> byCode = areaRepository.findByCountryIdAndCodeIgnoreCase(countryId, trimmed);
+        Optional<State> byCode = stateRepository.findByCountryIdAndCodeIgnoreCase(countryId, trimmed);
         if (byCode.isPresent()) return byCode;
-        return areaRepository.findByCountryIdAndNameIgnoreCase(countryId, trimmed);
+        return stateRepository.findByCountryIdAndNameIgnoreCase(countryId, trimmed);
+    }
+
+    public boolean isIndia(Long countryId) {
+        return countryId != null && countryRepository.findById(countryId)
+                .map(country -> "IN".equalsIgnoreCase(country.getCode())
+                        || "IND".equalsIgnoreCase(country.getCode())
+                        || "India".equalsIgnoreCase(country.getName()))
+                .orElse(false);
+    }
+
+    public Optional<State> resolveIndianState(Long countryId, String stateStr) {
+        if (countryId == null || stateStr == null || stateStr.trim().isEmpty()) return Optional.empty();
+        String trimmed = stateStr.trim();
+        Optional<State> byCode = stateRepository.findByCountryIdAndCodeIgnoreCase(countryId, trimmed);
+        return byCode.isPresent() ? byCode : stateRepository.findByCountryIdAndNameIgnoreCase(countryId, trimmed);
     }
 
     /**

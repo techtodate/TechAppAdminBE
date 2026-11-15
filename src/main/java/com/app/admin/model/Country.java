@@ -13,8 +13,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "countries", schema = "public", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_country_iso_code", columnNames = {"iso_code"}),
+@Table(name = "country", schema = "public", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_country_code", columnNames = {"code"}),
         @UniqueConstraint(name = "uq_country_name", columnNames = {"name"})
 })
 @Getter @Setter @NoArgsConstructor
@@ -24,20 +24,21 @@ public class Country {
     private Long id;
 
     @NotBlank
-    @Size(max = 10)
-    @Column(name = "iso_code", nullable = false, length = 10)
+    @Size(max = 3)
+    @Column(name = "code", nullable = false, length = 3)
     private String isoCode;
 
-    @Column(name = "iso3_code", length = 10)
-    private String iso3Code;
-
     @NotBlank
-    @Size(max = 150)
-    @Column(nullable = false, length = 150)
+    @Size(max = 100)
+    @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(name = "phone_code", length = 20)
+    @Size(max = 5)
+    @Column(name = "phone_code", length = 5)
     private String phoneCode;
+
+    @Column(name = "display_order", nullable = false)
+    private Integer displayOrder = 0;
 
     @NotNull
     @Column(nullable = false)
@@ -54,10 +55,19 @@ public class Country {
     private LocalDateTime updatedAt;
 
     public String getCode() {
-        return iso3Code != null ? iso3Code : isoCode;
+        return isoCode;
     }
 
     public void setCode(String code) {
         this.isoCode = code;
+    }
+
+    /** Legacy API alias retained while the database stores one canonical country code. */
+    public String getIso3Code() {
+        return isoCode;
+    }
+
+    public void setIso3Code(String iso3Code) {
+        this.isoCode = iso3Code;
     }
 }

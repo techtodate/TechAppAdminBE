@@ -1,74 +1,80 @@
 package com.app.admin.security;
 
+import com.app.admin.exception.InstitutionException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import com.app.admin.exception.InstitutionException;
-
-import jakarta.servlet.http.HttpServletRequest;
-
 @Component
 public class AdminSecurityContext {
+    public static final String REQUEST_PRINCIPAL = AdminPrincipal.class.getName();
 
+    public static final String PERMISSION_ADMIN_APP_ACCESS = "ADMIN_APP_ACCESS";
+    public static final String PERMISSION_ADMIN_USER_VIEW = "USER_VIEW";
+    public static final String PERMISSION_ADMIN_USER_MANAGE = "USER_UPDATE";
+    public static final String PERMISSION_ADMIN_ROLE_VIEW = "ROLE_VIEW";
+    public static final String PERMISSION_ADMIN_ROLE_MANAGE = "ROLE_UPDATE";
+    public static final String PERMISSION_DASHBOARD_VIEW = "DASHBOARD_VIEW";
+    public static final String PERMISSION_CATALOG_VIEW = "CATALOG_VIEW";
+    public static final String PERMISSION_CATALOG_MANAGE = "CATALOG_MANAGE";
+    public static final String PERMISSION_EVENT_REVIEW_VIEW = "EVENT_REVIEW_VIEW";
+    public static final String PERMISSION_EVENT_REVIEW_MANAGE = "EVENT_REVIEW_MANAGE";
     public static final String PERMISSION_INSTITUTION_VIEW = "INSTITUTION_VIEW";
     public static final String PERMISSION_INSTITUTION_IMPORT = "INSTITUTION_IMPORT";
     public static final String PERMISSION_INSTITUTION_MANAGE = "INSTITUTION_MANAGE";
+    public static final String PERMISSION_TECH_UPDATE_MANAGE = "TECH_UPDATE_MANAGE";
+    public static final String PERMISSION_FINANCIAL_VIEW = "TRAINING_FINANCIAL_VIEW";
+    public static final String PERMISSION_FINANCIAL_MANAGE = "TRAINING_FINANCIAL_MANAGE";
+    public static final String PERMISSION_SETTLEMENT_PROCESS = "TRAINING_SETTLEMENT_PROCESS";
+    public static final String PERMISSION_SETTLEMENT_RECONCILE = "TRAINING_SETTLEMENT_RECONCILE";
+    public static final String PERMISSION_VERIFICATION_VIEW = "VERIFICATION_VIEW";
+    public static final String PERMISSION_VERIFICATION_MANAGE = "VERIFICATION_REVIEW";
+
+    public AdminPrincipal currentPrincipal() {
+        ServletRequestAttributes attrs=(ServletRequestAttributes)RequestContextHolder.getRequestAttributes();
+        if(attrs==null) return null;
+        Object principal=attrs.getRequest().getAttribute(REQUEST_PRINCIPAL);
+        return principal instanceof AdminPrincipal p?p:null;
+    }
 
     public String getCurrentUsername() {
-        // If Spring Security is present in classpath and configured, we can extract from SecurityContextHolder
-        try {
-            Class<?> holderClass = Class.forName("org.springframework.security.core.context.SecurityContextHolder");
-            Object context = holderClass.getMethod("getContext").invoke(null);
-            if (context != null) {
-                Object auth = context.getClass().getMethod("getAuthentication").invoke(context);
-                if (auth != null) {
-                    Object name = auth.getClass().getMethod("getName").invoke(auth);
-                    if (name != null && !name.toString().equalsIgnoreCase("anonymousUser")) {
-                        return name.toString();
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            // Spring Security is not present or not configured
-        }
+        AdminPrincipal principal=currentPrincipal();
+        return principal==null?"anonymous":principal.email();
+    }
 
-        // Check request header if available
-        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs != null) {
-            HttpServletRequest request = attrs.getRequest();
-            String userHeader = request.getHeader("X-Admin-User");
-            if (userHeader != null && !userHeader.isBlank()) {
-                return userHeader.trim();
-            }
-        }
-
-        return "admin";
+    public String getAuthenticatedUsername() {
+        AdminPrincipal principal=currentPrincipal();
+        return principal==null?null:principal.email();
     }
 
     public Long getCurrentUserId() {
-        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs != null) {
-            HttpServletRequest request = attrs.getRequest();
-            String idHeader = request.getHeader("X-Admin-User-Id");
-            if (idHeader != null && !idHeader.isBlank()) {
-                try {
-                    return Long.parseLong(idHeader.trim());
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-        return 1L;
+        AdminPrincipal principal=currentPrincipal();
+        return principal==null?null:principal.id();
+    }
+
+    public Long getAuthenticatedUserId() { return getCurrentUserId(); }
+
+    public boolean isSuperAdmin() {
+        AdminPrincipal principal=currentPrincipal();
+        return principal!=null&&principal.roles().contains("SUPER_ADMIN");
+    }
+
+    public boolean hasPermission(String permission) {
+        AdminPrincipal principal=currentPrincipal();
+        return principal!=null&&(principal.roles().contains("SUPER_ADMIN")||principal.permissions().contains(permission));
     }
 
     public void requirePermission(String permission) {
-        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs != null) {
-            HttpServletRequest request = attrs.getRequest();
-            String forbiddenHeader = request.getHeader("X-Simulate-Forbidden");
-            if ("true".equalsIgnoreCase(forbiddenHeader)) {
-                throw InstitutionException.unauthorizedImportAction("User lacks required permission: " + permission);
-            }
-        }
-        // Admin user has all required permissions by default in the current project model
+        AdminPrincipal principal=currentPrincipal();
+        if(principal==null) throw new InstitutionException(HttpStatus.UNAUTHORIZED,"ADMIN_AUTHENTICATION_REQUIRED","Admin authentication is required");
+        if(!principal.roles().contains("SUPER_ADMIN")&&!principal.permissions().contains(permission))
+            throw InstitutionException.unauthorizedImportAction("User lacks required permission: "+permission);
+    }
+
+    public HttpServletRequest currentRequest() {
+        ServletRequestAttributes attrs=(ServletRequestAttributes)RequestContextHolder.getRequestAttributes();
+        return attrs==null?null:attrs.getRequest();
     }
 }

@@ -48,7 +48,7 @@ public class InstitutionSourceMapping {
     private Map<String, Object> transformationConfig;
 
     @NotNull
-    @Column(name = "is_required", nullable = false)
+    @Column(name = "required", nullable = false)
     private Boolean isRequired = false;
 
     @NotNull

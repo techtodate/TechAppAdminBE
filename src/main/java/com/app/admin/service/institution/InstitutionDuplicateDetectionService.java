@@ -48,30 +48,12 @@ public class InstitutionDuplicateDetectionService {
             }
         }
 
-        // Stage 2: Exact normalized match (country_id + normalized_name + city_id)
-        if (data.getCountryId() != null && data.getNormalizedName() != null) {
-            if (data.getCityId() != null) {
-                List<Institution> exactCityMatch = institutionRepository
-                        .findByCountryIdAndNormalizedNameAndCityId(data.getCountryId(), data.getNormalizedName(), data.getCityId());
-                if (!exactCityMatch.isEmpty()) {
-                    return DuplicateCheckResult.duplicate(exactCityMatch.stream().map(i -> buildExactCandidate(i, data, "Stage 2: Exact country, name, and city match")).toList());
-                }
-            }
-
-            // Also check country_id + normalized_name + state_id if state is present
-            if (data.getStateId() != null) {
-                List<Institution> exactStateMatch = institutionRepository
-                        .findByCountryIdAndNormalizedNameAndStateId(data.getCountryId(), data.getNormalizedName(), data.getStateId());
-                if (!exactStateMatch.isEmpty()) {
-                    return DuplicateCheckResult.duplicate(exactStateMatch.stream().map(i -> buildExactCandidate(i, data, "Stage 2: Exact country, name, and state match")).toList());
-                }
-            }
-        }
-
         // Stage 3: Possible duplicate matching (fuzzy / component scoring)
         List<MatchCandidate> matchCandidates = new ArrayList<>();
-        if (data.getCountryId() != null) {
-            List<Institution> candidates = institutionRepository.findByCountryId(data.getCountryId());
+        {
+            List<Institution> candidates = data.getCountryCode() == null
+                    ? institutionRepository.findAll()
+                    : institutionRepository.findByCountryCodeIgnoreCase(data.getCountryCode());
 
             for (Institution candidate : candidates) {
                 int score = 0;
@@ -90,23 +72,21 @@ public class InstitutionDuplicateDetectionService {
                 }
 
                 // 2. Country match (15 points)
-                if (candidate.getCountryId().equals(data.getCountryId())) {
+                if (data.getCountryCode() != null && data.getCountryCode().equalsIgnoreCase(candidate.getCountryCode())) {
                     score += 15;
                     reason.put("country_match", 15);
                 }
 
                 // 3. City match (15 points)
-                if (data.getCityId() != null && candidate.getCityId() != null && candidate.getCityId().equals(data.getCityId())) {
-                    score += 15;
-                    reason.put("city_match", 15);
-                } else if (data.getCity() != null && candidate.getCityName() != null
+                if (data.getCity() != null && candidate.getCityName() != null
                         && data.getCity().equalsIgnoreCase(candidate.getCityName())) {
                     score += 15;
                     reason.put("city_match", 15);
                 }
 
                 // 4. Administrative Area match (10 points)
-                if (data.getStateId() != null && candidate.getStateId() != null && candidate.getStateId().equals(data.getStateId())) {
+                if (data.getAdministrativeAreaCode() != null && candidate.getAdministrativeAreaCode() != null
+                        && candidate.getAdministrativeAreaCode().equalsIgnoreCase(data.getAdministrativeAreaCode())) {
                     score += 10;
                     reason.put("administrative_area_match", 10);
                 }
@@ -146,8 +126,10 @@ public class InstitutionDuplicateDetectionService {
         if (!Objects.equals(inst.getInstitutionType(), data.getInstitutionType())) return true;
         if (!Objects.equals(inst.getAddress(), data.getAddress())) return true;
         if (!Objects.equals(inst.getWebsite(), data.getWebsite())) return true;
-        if (data.getStateId() != null && !Objects.equals(inst.getStateId(), data.getStateId())) return true;
-        if (data.getCityId() != null && !Objects.equals(inst.getCityId(), data.getCityId())) return true;
+        if (data.getCountryCode() != null && !Objects.equals(inst.getCountryCode(), data.getCountryCode())) return true;
+        if (data.getAdministrativeAreaCode() != null && !Objects.equals(inst.getAdministrativeAreaCode(), data.getAdministrativeAreaCode())) return true;
+        if (data.getSubAdministrativeArea() != null && !Objects.equals(inst.getSubAdministrativeArea(), data.getSubAdministrativeArea())) return true;
+        if (data.getCity() != null && !Objects.equals(inst.getCityName(), data.getCity())) return true;
         return false;
     }
 
@@ -157,11 +139,11 @@ public class InstitutionDuplicateDetectionService {
         reason.put("name_score", 50);
         reason.put("country_match", 15);
         int score = 65;
-        if (data.getCityId() != null && Objects.equals(data.getCityId(), inst.getCityId())) {
+        if (data.getCity() != null && Objects.equals(data.getCity(), inst.getCityName())) {
             score += 15;
             reason.put("city_match", 15);
         }
-        if (data.getStateId() != null && Objects.equals(data.getStateId(), inst.getStateId())) {
+        if (data.getAdministrativeAreaCode() != null && Objects.equals(data.getAdministrativeAreaCode(), inst.getAdministrativeAreaCode())) {
             score += 10;
             reason.put("administrative_area_match", 10);
         }

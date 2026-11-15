@@ -1,6 +1,5 @@
 package com.app.admin.service.institution;
 
-import java.net.URI;
 import java.util.*;
 import org.springframework.stereotype.Service;
 
@@ -36,25 +35,6 @@ public class InstitutionValidationService {
             errors.add("Institution name exceeds maximum length of 255 characters");
         }
 
-        // 3. Country and Country/Source compatibility
-        if (data.getCountryId() == null) {
-            errors.add("Country could not be resolved or is missing");
-        } else if (expectedCountry != null && !expectedCountry.getId().equals(data.getCountryId())) {
-            errors.add("Resolved country ID " + data.getCountryId() + " does not match expected import country ID " + expectedCountry.getId());
-        }
-
-        if (source != null && data.getCountryId() != null && !source.getCountryId().equals(data.getCountryId())) {
-            errors.add("Source country ID " + source.getCountryId() + " does not match row country ID " + data.getCountryId());
-        }
-
-        // 4. Website validation if supplied
-        if (data.getWebsite() != null && !data.getWebsite().isBlank()) {
-            String web = data.getWebsite().trim();
-            if (!isValidUrl(web)) {
-                errors.add("Malformed website URL: " + web);
-            }
-        }
-
         if (!errors.isEmpty()) {
             return ValidationResult.invalid(errors);
         }
@@ -66,13 +46,4 @@ public class InstitutionValidationService {
         return ValidationResult.ok();
     }
 
-    private boolean isValidUrl(String url) {
-        try {
-            URI uri = URI.create(url);
-            String scheme = uri.getScheme();
-            return scheme != null && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")) && uri.getHost() != null;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 }

@@ -9,8 +9,13 @@ import jakarta.validation.constraints.Size;
 public record CreateInstitutionImportRequest(
         @JsonProperty("country_id") @JsonAlias("countryId") @NotNull(message = "country_id is required") @Positive Long countryId,
         @JsonProperty("source_id") @JsonAlias("sourceId") @NotNull(message = "source_id is required") @Positive Long sourceId,
+        @JsonProperty("country_code") @JsonAlias("countryCode") @Size(max = 3) String countryCode,
         @JsonProperty("version") @Size(max = 100) String version,
         @JsonProperty("import_type") @JsonAlias("importType") @jakarta.validation.constraints.Pattern(regexp = "FULL|INCREMENTAL", message = "import_type must be FULL or INCREMENTAL") String importType,
-        @JsonProperty("file_name") @JsonAlias("fileName") @Size(max = 255) String fileName
+        @JsonProperty("file_name") @JsonAlias("fileName") @Size(max = 255) String fileName,
+        @JsonProperty("ignore_duplicate_check") @JsonAlias("ignoreDuplicateCheck") Boolean ignoreDuplicateCheck
 ) {
+    public CreateInstitutionImportRequest(Long countryId, Long sourceId, String version, String importType, String fileName) {
+        this(countryId, sourceId, null, version, importType, fileName, null);
+    }
 }

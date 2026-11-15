@@ -59,7 +59,7 @@ public class City {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "administrative_area_id", insertable = false, updatable = false)
-    private AdministrativeArea administrativeArea;
+    private State administrativeArea;
 
     public Long getDistrictId() {
         return administrativeAreaId;

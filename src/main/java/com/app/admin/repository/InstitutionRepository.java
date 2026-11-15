@@ -24,6 +24,8 @@ public interface InstitutionRepository extends JpaRepository<Institution, Long>,
 
     List<Institution> findByCountryId(Long countryId);
 
+    List<Institution> findByCountryCodeIgnoreCase(String countryCode);
+
     Page<Institution> findByCountryId(Long countryId, Pageable pageable);
 
     @Query("SELECT i FROM Institution i WHERE LOWER(i.name) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(i.shortName) LIKE LOWER(CONCAT('%', :query, '%'))")
