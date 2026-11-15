@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +15,9 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.data.domain.PageRequest;
 import jakarta.persistence.EntityManager;
 import com.app.admin.dto.*;
@@ -22,7 +27,7 @@ import com.app.admin.service.institution.*;
 
 /** Explicitly enabled local PostgreSQL contract test. All fixture rows roll back. */
 @EnabledIfEnvironmentVariable(named="INSTITUTION_POSTGRES_AUDIT", matches="true")
-@SpringBootTest(properties={"spring.jpa.hibernate.ddl-auto=none", "spring.jpa.show-sql=false"})
+@SpringBootTest(properties={"app.admin.jwt-secret=postgres-contract-test-secret-at-least-32-bytes", "spring.jpa.hibernate.ddl-auto=none", "spring.jpa.show-sql=false", "media.storage.provider=azure", "media.storage.azure.connection-string=UseDevelopmentStorage=true", "media.public-base-url=https://example.invalid/public-media"})
 @Transactional
 class InstitutionPostgresContractTest {
     @TempDir static Path uploads;
@@ -38,6 +43,14 @@ class InstitutionPostgresContractTest {
     @Autowired InstitutionApiService api;
     @Autowired InstitutionImportRecordRepository records;
     @Autowired InstitutionAliasRepository aliases;
+
+    @BeforeEach void authenticateAsSuperAdmin() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute(com.app.admin.security.AdminSecurityContext.REQUEST_PRINCIPAL,
+                new com.app.admin.security.AdminPrincipal(1L,"contract","contract@example.test","Contract","Admin",true,false,Set.of("SUPER_ADMIN"),Set.of(),"contract-test"));
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    }
+    @AfterEach void clearRequestContext() { RequestContextHolder.resetRequestAttributes(); }
 
     private long prepare(long country, long source, String csv) {
         var item=workflow.createImport(new CreateInstitutionImportRequest(country, source, "audit", "FULL", null));
